@@ -33,8 +33,8 @@ The refinement works in two stages:
 ```mermaid
 flowchart LR
     A[Input 3D Mesh<br/>Triangles] --> B[Edge Sampling<br/>Shared edges constrained]
-    B --> C[Constrained Delaunay<br/>Shewchuk's Triangle]
-    C --> D[Refined Faces<br/>Parallel processing]
+    B --> C[Project to 2D<br/>Per-face UV plane]
+    C --> D[Constrained Delaunay<br/>Shewchuk's Triangle]
     D --> E[Map Back to 3D]
     E --> F[Output 3D Mesh<br/>Refined]
 ```
