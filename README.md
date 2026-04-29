@@ -19,41 +19,43 @@ SurfRemesh is a C++20 library and command-line tool for refining triangular surf
 
 ## Algorithm
 
-The refinement works by processing each triangular face independently:
+The refinement works in two stages:
 
-1. **Project to 2D**: Map each triangular face onto its own 2D plane using local coordinate system
-2. **Delaunay Triangulation**: Apply Shewchuk's Triangle algorithm to generate optimal 2D triangulation
-3. **Map back to 3D**: Convert refined 2D triangles back to 3D coordinates
+### Stage 1: Edge Refinement
+1. Sample each edge based on max edge length
+2. Shared edges (border between two faces) are constrained - both faces share the same edge nodes
+
+### Stage 2: Face Triangulation
+1. Project each triangular face onto its own 2D plane using local coordinate system
+2. Apply constrained Delaunay triangulation using Shewchuk's Triangle
+3. Map refined 2D triangles back to 3D coordinates
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Input 3D Mesh  │────▶│  Per-Face 2D    │────▶│ Delaunay        │
-│  (Triangles)    │     │  Projection     │     │ Triangulation   │
+│  Input 3D Mesh  │────▶│  Edge Sampling  │────▶│ Constrained     │
+│  (Triangles)    │     │  (Shared edges) │     │ Delaunay       │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
                                                         │
                                                         ▼
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Output 3D Mesh │◀────│  Map Back to 3D │◀────│  Refined 2D     │
-│  (Refined)       │     │                 │     │  Triangulation  │
+│  Output 3D Mesh │◀────│  Map Back to 3D  │◀────│  Refined Faces  │
+│  (Refined)     │     │                 │     │  (Parallel)    │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-**Why Planar Delaunay?**
+**Embarrassingly Parallel**: Each edge and face can be processed independently:
+- Edge sampling: No dependencies between edges
+- Face triangulation: Faces share boundary nodes but refinement is independent
+- Perfect for parallel processing on multi-core GPUs/CPUs
 
-Since each original triangle is a flat planar surface:
-- **No curvature constraints**: Delaunay optimization works on ideal flat geometry
-- **No crease preservation**: Each face treated independently preserves boundaries
-- **Quality optimization**: Triangle quality metric (aspect ratio) is globally optimized
-- **Better downstream processing**: Refined mesh enables:
-  - Smoothing algorithms converge faster
-  - Fairing/optimization has more degrees of freedom
-  - FEM mesh quality improved for simulation
+**Constrained Delaunay**: Shared edges are marked as constraints so both adjacent faces use consistent node sampling
 
 ## Features
 
-- **Planar Delaunay Refinement**: Each triangle processed independently in 2D projection
-- **Jonathan Shewchuk's Triangle**: Uses industry-standard Delaunay triangulation
-- **High-Quality Meshes**: Optimized triangle quality independent of surface curvature
+- **Edge Constrained Refinement**: Shared edges between faces use consistent sampling
+- **Constrained Delaunay**: Uses Shewchuk's Triangle with segment constraints
+- **Embarrassingly Parallel**: All edges and faces can be processed independently
+- **Scalable**: O(n) with near-linear speedup on multi-core CPUs/GPUs
 - **Multi-Format Support**: Load meshes in various formats (OFF, OBJ, STL, PLY, FBX, glTF, GLB, 3DS, DAE)
 - **Edge Analysis**: Analyze edge length distribution with histogram visualization
 - **Modern C++**: Built with C++20 and standard libraries
