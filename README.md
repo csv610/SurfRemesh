@@ -15,14 +15,47 @@
   </a>
 </p>
 
-SurfRemesh is a C++20 library and command-line tool for refining triangular surface meshes using Delaunay triangulation. It supports various 3D mesh formats and provides edge length distribution analysis.
+SurfRemesh is a C++20 library and command-line tool for refining triangular surface meshes using a planar Delaunay triangulation approach. It projects each triangular face to 2D, applies Delaunay refinement using Jonathan Shewchuk's Triangle algorithm, and maps the refined result back to 3D.
+
+## Algorithm
+
+The refinement works by processing each triangular face independently:
+
+1. **Project to 2D**: Map each triangular face onto its own 2D plane using local coordinate system
+2. **Delaunay Triangulation**: Apply Shewchuk's Triangle algorithm to generate optimal 2D triangulation
+3. **Map back to 3D**: Convert refined 2D triangles back to 3D coordinates
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Input 3D Mesh  │────▶│  Per-Face 2D    │────▶│ Delaunay        │
+│  (Triangles)    │     │  Projection     │     │ Triangulation   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Output 3D Mesh │◀────│  Map Back to 3D │◀────│  Refined 2D     │
+│  (Refined)       │     │                 │     │  Triangulation  │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+**Why Planar Delaunay?**
+
+Since each original triangle is a flat planar surface:
+- **No curvature constraints**: Delaunay optimization works on ideal flat geometry
+- **No crease preservation**: Each face treated independently preserves boundaries
+- **Quality optimization**: Triangle quality metric (aspect ratio) is globally optimized
+- **Better downstream processing**: Refined mesh enables:
+  - Smoothing algorithms converge faster
+  - Fairing/optimization has more degrees of freedom
+  - FEM mesh quality improved for simulation
 
 ## Features
 
-- **Mesh Refinement**: Refine triangular meshes using Delaunay triangulation
+- **Planar Delaunay Refinement**: Each triangle processed independently in 2D projection
+- **Jonathan Shewchuk's Triangle**: Uses industry-standard Delaunay triangulation
+- **High-Quality Meshes**: Optimized triangle quality independent of surface curvature
 - **Multi-Format Support**: Load meshes in various formats (OFF, OBJ, STL, PLY, FBX, glTF, GLB, 3DS, DAE)
 - **Edge Analysis**: Analyze edge length distribution with histogram visualization
-- **Quality Control**: Configurable max/min edge lengths
 - **Modern C++**: Built with C++20 and standard libraries
 
 ## Installation
@@ -162,9 +195,13 @@ Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTIN
 
 ## Related Papers
 
-If you use this software in academic work, please cite:
+If you use this software in academic work, please cite the original Delaunay triangulation papers:
 
 > Shewchuk, J. R. (2002). Delaunay Refinement Algorithms for Triangular Mesh Generation. *Computational Geometry: Theory and Applications*, 22(1-3), 21-74.
+
+> Shewchuk, J. R. (1997). Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates. *Discrete & Computational Geometry*, 18(3), 305-363.
+
+> Ruppert, J. (1995). A Delaunay Refinement Algorithm for Quality 2-Dimensional Mesh Generation. *Journal of Algorithms*, 18(3), 548-585.
 
 ---
 
