@@ -30,13 +30,13 @@ The refinement works in two stages:
 2. Apply constrained Delaunay triangulation using Shewchuk's Triangle
 3. Map refined 2D triangles back to 3D coordinates
 
-```
-Input 3D Mesh → Edge Sampling → Constrained Delaunay → Refined Faces
-     │              │                  │                   │
-     └──────────────┴──────────────────┴──────────────────┘
-                            │
-                            ▼
-                   Map Back to 3D → Output 3D Mesh
+```mermaid
+flowchart LR
+    A[Input 3D Mesh<br/>Triangles] --> B[Edge Sampling<br/>Shared edges constrained]
+    B --> C[Constrained Delaunay<br/>Shewchuk's Triangle]
+    C --> D[Refined Faces<br/>Parallel processing]
+    D --> E[Map Back to 3D]
+    E --> F[Output 3D Mesh<br/>Refined]
 ```
 
 **Embarrassingly Parallel**: Each edge and face can be processed independently:
