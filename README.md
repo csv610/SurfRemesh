@@ -31,16 +31,12 @@ The refinement works in two stages:
 3. Map refined 2D triangles back to 3D coordinates
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Input 3D Mesh  │────▶│  Edge Sampling  │────▶│ Constrained     │
-│  (Triangles)    │     │  (Shared edges) │     │ Delaunay       │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                                                        │
-                                                        ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Output 3D Mesh │◀────│  Map Back to 3D  │◀────│  Refined Faces  │
-│  (Refined)     │     │                 │     │  (Parallel)    │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+Input 3D Mesh → Edge Sampling → Constrained Delaunay → Refined Faces
+     │              │                  │                   │
+     └──────────────┴──────────────────┴──────────────────┘
+                            │
+                            ▼
+                   Map Back to 3D → Output 3D Mesh
 ```
 
 **Embarrassingly Parallel**: Each edge and face can be processed independently:
