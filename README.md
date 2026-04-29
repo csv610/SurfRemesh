@@ -54,6 +54,7 @@ flowchart LR
 - **Scalable**: O(n) with near-linear speedup on multi-core CPUs/GPUs
 - **Multi-Format Support**: Load meshes in various formats (OFF, OBJ, STL, PLY, FBX, glTF, GLB, 3DS, DAE)
 - **Edge Analysis**: Analyze edge length distribution with histogram visualization
+- **Best for Coarse Meshes**: Quick uniform refinement of coarse triangular meshes
 - **Modern C++**: Built with C++20 and standard libraries
 
 ## Installation
@@ -201,8 +202,22 @@ If you use this software in academic work, please cite the original Delaunay tri
 
 > Ruppert, J. (1995). A Delaunay Refinement Algorithm for Quality 2-Dimensional Mesh Generation. *Journal of Algorithms*, 18(3), 548-585.
 
----
+## When to Use This Algorithm
 
-<p align="center">
-  Built with C++20 • CMake • ASSIMP
-</p>
+**Suitable for:**
+- **Coarse mesh refinement**: Initial mesh has very large triangles that need uniform subdivision
+- **Quick prototyping**: Fast refinement without complex setup
+- **Preprocessing**: Generate denser mesh before applying smoothing/fairing algorithms
+- **Isotropic refinement**: When uniform triangle sizes are needed across the surface
+
+**Not suitable for:**
+- **Quality improvement**: For remeshing to improve triangle quality (aspect ratio)
+- **Anisotropic meshing**: When directional refinement is needed
+- **Topology changes**: When boundary modification is required
+
+**Alternative tools for quality remeshing:**
+- [Geogram](https://github.com/BrunoLevy/geogram) - Advanced remeshing
+- [Polygon Mesh Processing](https://github.com/pmelberg/pmp) - Quality mesh processing
+- [CGAL](https://www.cgal.org/) - Computational geometry library
+
+Use this tool when you have a coarse mesh and need quick uniform refinement. Use Geogram/ PMP/CGAL when you need high-quality optimized meshes or non-uniform refinement strategies.
