@@ -11,16 +11,17 @@
 
 class SurfRemesh
 {
-    class Node;
+public:
+    struct Node;
     using NodePtr = std::shared_ptr<Node>;
 
-    class Edge;
+    struct Edge;
     using EdgePtr = std::shared_ptr<Edge>;
 
-    class Face;
+    struct Face;
     using FacePtr = std::shared_ptr<Face>;
 
-    class Mesh;
+    struct Mesh;
     using MeshPtr = std::shared_ptr<Mesh>;
 
     struct Node

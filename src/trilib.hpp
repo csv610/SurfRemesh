@@ -261,7 +261,7 @@ inline std::array<T,N> centroid( const std::array<T,N> &pa,
                                  const std::array<T,N> &pc)
 {
     std::array<T,N> c;
-    for( int i = 0; i < N; i++) c[i] = (pa[i] + pb[i] + pc[2])/3.0;
+    for( int i = 0; i < N; i++) c[i] = (pa[i] + pb[i] + pc[i])/3.0;
     return c;
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -323,8 +323,8 @@ inline T circumradius( const std::array<T,N> &pa,
 
 template<class T, size_t N>
 inline std::array<T,N> incenter( const std::array<T,N> &pa,
-                                 const std::array<T,N> &pb,
-                                 const std::array<T,N> &pc)
+                                const std::array<T,N> &pb,
+                                const std::array<T,N> &pc)
 {
     std::array<T,N> coords;
     T a  =  length( pb, pc );
@@ -332,8 +332,8 @@ inline std::array<T,N> incenter( const std::array<T,N> &pa,
     T c  =  length( pa, pb );
     T t  =  a + b + c;
 
-    for( int i = 0; i < N; i++) 
-        coords[0] = (a*pa[i] + b*pb[i] + c*pc[i] )/t;
+    for( int i = 0; i < N; i++)
+        coords[i] = (a*pa[i] + b*pb[i] + c*pc[i] )/t;
 
     return coords;
 }
