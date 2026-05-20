@@ -64,7 +64,7 @@ template<class T, size_t N>
 inline T length(const std::array<T,N> &A, const std::array<T,N> &B)
 {
     T  sum = 0;
-    for( int i = 0; i < N; i++) {
+    for( size_t i = 0; i < N; i++) {
 	    T dl = A[i]-B[i];
 	    sum  +=  dl*dl;
     }
@@ -75,7 +75,7 @@ template<class T, size_t N>
 inline T length2( const std::array<T,N> &A, const std::array<T,N> &B)
 {
     T  sum = 0;
-    for( int i = 0; i < N; i++) {
+    for( size_t i = 0; i < N; i++) {
 	    T dl  = A[i]-B[i];
 	    sum  +=  dl*dl;
     }
@@ -86,7 +86,7 @@ template<class T, size_t N>
 inline T magnitude( const std::array<T,N> &A )
 {
     T  sum = 0;
-    for( int i = 0; i < N; i++) sum += A[i]*A[i];
+    for( size_t i = 0; i < N; i++) sum += A[i]*A[i];
     return sqrt(sum);
 }
 
@@ -94,8 +94,8 @@ template<class T, size_t N>
 inline T dot_product( const std::array<T,N> &A, const std::array<T,N> &B)
 {
     T  sum = 0;
-    for( int i = 0; i < N; i++) sum += A[i]*B[i];
-    return sqrt(sum);
+    for( size_t i = 0; i < N; i++) sum += A[i]*B[i];
+    return sum;
 }
 
 template<class T>

@@ -5,6 +5,7 @@
 #include <map>
 
 #include "veclib.hpp"
+#include "trilib.hpp"
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -26,6 +27,7 @@ public:
 
     struct Node
     {
+        explicit Node() : id(0), xyz({0,0,0}) {}
         size_t  id;
         Array3D xyz;
         std::vector<EdgePtr> edges;
@@ -33,6 +35,7 @@ public:
 
     struct Edge
     {
+        explicit Edge() = default;
         int getOrientation( const NodePtr &v0, const NodePtr &v1) const
         {
             if( nodes[0] == v0  && nodes[1] == v1) return 1;
@@ -55,8 +58,9 @@ public:
 
     struct Face
     {
-        void refine(double len);
-        void delaunay(std::vector<int> &segments, std::vector<double> &uvCoords, std::vector<int> &connect);
+        explicit Face() : area(0.0) {}
+        void refine(double len, double minAngle = 30.0);
+        void delaunay(std::vector<int> &segments, std::vector<double> &uvCoords, std::vector<int> &connect, double minAngle = 30.0);
 
         EdgePtr getEdgeAt(int i);
 
@@ -66,7 +70,7 @@ public:
         MeshPtr mesh;
         std::array<Array2D,3> uvCorners;
         std::array<NodePtr,3> nodes;
-	double area;
+        double area;
     };
 
     struct Mesh
@@ -84,58 +88,96 @@ public:
 public:
     SurfRemesh();
 
-    // Set the mesh (only off format) ...
+    /**
+     * @brief Set the input mesh file path
+     * @param f Path to mesh file (OFF, OBJ, PLY, STL, etc.)
+     */
     void setMesh( const std::string &f) {
         infilename = f;
     }
 
-    // If we do not know the length of the model, then we can decide
-    // the maxEdgeLength based on how many times the longest edge 
-    // is divided. This can set the maxEdgeLength of the model.
-    // Howwever, if the maxEdgeLength is spcified, then this parameter
-    // is ignored.
-
+    /**
+     * @brief Set number of refinement steps for automatic edge length calculation
+     * @param n Number of steps (divides longest edge n times)
+     *
+     * If maxEdgeLength is specified via setMaxEdgeLength(), this parameter is ignored.
+     */
     void setMaxSteps(int n) {
 	    maxSteps = n;
     }
 
-    // Set the desired maximum edge length ...
+    /**
+     * @brief Set the desired maximum edge length
+     * @param l Maximum edge length in mesh units
+     */
     void setMaxEdgeLength( double l) {
         maxEdgeLength = l;
     }
 
-    // Set the desired minimum edge length ...
+    /**
+     * @brief Set the desired minimum edge length
+     * @param l Minimum edge length in mesh units (optional constraint)
+     */
     void setMinEdgeLength( double l) {
         minEdgeLength = l;
     }
 
-    // Set the crease angle..
+    /**
+     * @brief Set the crease angle for feature detection
+     * @param a Angle in degrees for identifying sharp edges
+     */
     void setCreaseAngle( double a) {
         creaseAngle = a;
     }
 
-    // Collected (minimum, mean, maximum) edge lengths of the model ...
+    /**
+     * @brief Set the minimum angle for quality mesh generation
+     * @param a Angle in degrees (20-34 recommended, default 30)
+     */
+    void setQualityMinAngle( double a) {
+        qualityMinAngle = a;
+    }
+
+    /**
+     * @brief Get edge length statistics (min, mean, max)
+     * @return Array of [min, mean, max] edge lengths
+     */
     std::array<double,3>  getEdgeLengths() const;
 
-    // Start executing the code ...
+    /**
+     * @brief Execute mesh refinement algorithm
+     */
     void refine();
 
-    // Return the refined mesh nodes and triangles ...
+    /**
+     * @brief Get refined mesh nodes as 3D points
+     * @return Vector of Array3D (x,y,z) coordinates
+     */
     std::vector<Array3D> getNodes() const;
+
+    /**
+     * @brief Get refined mesh triangle connectivity
+     * @return Vector of Array3I (i0,i1,i2) vertex indices
+     */
     std::vector<Array3I> getTriangles() const;
 
-    // Store the refined mesh ...
-    void saveAs( const std::string &s);
+    /**
+     * @brief Save refined mesh to file
+     * @param s Output file path (OFF format)
+     * @return true on success, false on failure
+     */
+    bool saveAs( const std::string &s) const;
 
 private:
-Mesh mesh;
+    mutable Mesh mesh;
     std::string infilename;
     double maxEdgeLength   = 0.0;
     double minEdgeLength   = 0.0;
     double creaseAngle     = 0.0;
     int    maxSteps        = 0;
+    double qualityMinAngle = 30.0;
 
-    void   readOFFMesh( const std::string &f);
-    void   loadMesh( const std::string &f);
-    void   buildEdges();
+    bool   readOFFMesh( const std::string &f) const;
+    bool   loadMesh( const std::string &f) const;
+    void   buildEdges() const;
 };

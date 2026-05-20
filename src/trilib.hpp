@@ -261,7 +261,7 @@ inline std::array<T,N> centroid( const std::array<T,N> &pa,
                                  const std::array<T,N> &pc)
 {
     std::array<T,N> c;
-    for( int i = 0; i < N; i++) c[i] = (pa[i] + pb[i] + pc[i])/3.0;
+    for( size_t i = 0; i < N; i++) c[i] = (pa[i] + pb[i] + pc[i])/3.0;
     return c;
 }
 ////////////////////////////////////////////////////////////////////////////////
@@ -297,7 +297,7 @@ inline std::array<T,N> circumcenter( const std::array<T,N> &pa,
     T v   =  b*b*(c*c + a*a - b*b);
     T w   =  c*c*(a*a + b*b - c*c);
 
-    for( int i = 0; i < N; i++) 
+    for( size_t i = 0; i < N; i++)
          coords[i] = (u*pa[i] + v*pb[i] + w*pc[i] )/(u+v+w);
 
     return coords;
@@ -332,7 +332,7 @@ inline std::array<T,N> incenter( const std::array<T,N> &pa,
     T c  =  length( pa, pb );
     T t  =  a + b + c;
 
-    for( int i = 0; i < N; i++)
+    for( size_t i = 0; i < N; i++)
         coords[i] = (a*pa[i] + b*pb[i] + c*pc[i] )/t;
 
     return coords;

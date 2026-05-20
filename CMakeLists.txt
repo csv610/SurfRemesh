@@ -9,17 +9,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
 include(CTest)
 
-find_package(assimp QUIET)
-if(NOT assimp_FOUND)
-    include(FetchContent)
-    FetchContent_Declare(
-        assimp
-        GIT_REPOSITORY https://github.com/assimp/assimp.git
-        GIT_TAG v5.4.2
-    )
-    FetchContent_MakeAvailable(assimp)
-endif()
-
 include(FetchContent)
 FetchContent_Declare(
     catch2
@@ -27,6 +16,8 @@ FetchContent_Declare(
     GIT_TAG v3.5.0
 )
 FetchContent_MakeAvailable(catch2)
+
+find_package(assimp REQUIRED)
 
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/triangle.c)
     message(STATUS "Downloading Triangle library...")
@@ -47,20 +38,25 @@ target_compile_definitions(triangle PUBLIC TRILIBRARY)
 target_include_directories(triangle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_options(triangle PRIVATE -w)
 
+add_library(surfremesh_lib STATIC
+    src/SurfRemesh.cpp
+)
+target_link_libraries(surfremesh_lib PRIVATE triangle assimp::assimp)
+target_include_directories(surfremesh_lib PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${ASSIMP_INCLUDE_DIRS}
+)
+
 add_executable(surfremesh
     app/main.cpp
-    src/SurfRemesh.cpp
-    src/SurfRemesh.h
 )
-target_link_libraries(surfremesh PRIVATE triangle assimp::assimp)
+target_link_libraries(surfremesh PRIVATE surfremesh_lib)
 target_include_directories(surfremesh PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_executable(edge_stats
     app/edge_stats.cpp
-    src/SurfRemesh.cpp
-    src/SurfRemesh.h
 )
-target_link_libraries(edge_stats PRIVATE triangle assimp::assimp)
+target_link_libraries(edge_stats PRIVATE surfremesh_lib)
 target_include_directories(edge_stats PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 enable_testing()
@@ -93,6 +89,7 @@ target_link_libraries(test_edge PRIVATE triangle assimp::assimp Catch2::Catch2Wi
 target_include_directories(test_edge PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${catch2_SOURCE_DIR}/extras
+    ${ASSIMP_INCLUDE_DIRS}
 )
 add_test(NAME edge_tests COMMAND test_edge)
 
@@ -104,6 +101,7 @@ target_link_libraries(test_face PRIVATE triangle assimp::assimp Catch2::Catch2Wi
 target_include_directories(test_face PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${catch2_SOURCE_DIR}/extras
+    ${ASSIMP_INCLUDE_DIRS}
 )
 add_test(NAME face_tests COMMAND test_face)
 
@@ -115,6 +113,7 @@ target_link_libraries(test_mesh PRIVATE triangle assimp::assimp Catch2::Catch2Wi
 target_include_directories(test_mesh PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${catch2_SOURCE_DIR}/extras
+    ${ASSIMP_INCLUDE_DIRS}
 )
 target_compile_definitions(test_mesh PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME mesh_tests COMMAND test_mesh)

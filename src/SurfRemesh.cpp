@@ -1,18 +1,17 @@
-#include "SurfRemesh.h"
-
-#define REAL double
-#define VOID void
-
 #include <algorithm>
-#include "trilib.hpp"
+#include <set>
 #include <cassert>
 #include <sstream>
 #include <iostream>
 #include <fstream>
 #include <limits>
+#include <array>
 
-using namespace std;
-using namespace JMath;
+#include "SurfRemesh.h"
+#include "trilib.hpp"
+
+#define REAL double
+#define VOID void
 
 #define ANSI_DECLARATORS
 extern "C" {
@@ -25,37 +24,30 @@ SurfRemesh :: SurfRemesh()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void SurfRemesh :: loadMesh( const string &filename)
+bool SurfRemesh :: loadMesh( const std::string &filename) const
 {
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(filename,
         aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
 
     if( !scene ) {
-        cout << "Error: Can't load model " << filename << endl;
-        return;
+        std::cerr << "Error: Can't load model " << filename << std::endl;
+        return false;
     }
 
-    map<string, string> extMap = {
-        {".obj", "obj"}, {".off", "off"}, {".ply", "ply"},
-        {".stl", "stl"}, {".fbx", "fbx"}, {".gltf", "gltf"},
-        {".glb", "glb"}, {".3ds", "3ds"}, {".dae", "dae"}
-    };
-
-    string ext = filename.substr(filename.find_last_of('.'));
-    transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    std::string ext = filename.substr(filename.find_last_of('.'));
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
     if( ext == ".off" ) {
-        readOFFMesh(filename);
-        return;
+        return readOFFMesh(filename);
     }
 
     size_t countnodes = 0;
     size_t countfaces = 0;
     for( unsigned int m = 0; m < scene->mNumMeshes; m++ ) {
-        aiMesh* mesh = scene->mMeshes[m];
-        countnodes += mesh->mNumVertices;
-        countfaces += mesh->mNumFaces;
+        aiMesh* srcMesh = scene->mMeshes[m];
+        countnodes += srcMesh->mNumVertices;
+        countfaces += srcMesh->mNumFaces;
     }
 
     mesh.nodes.resize(countnodes);
@@ -67,7 +59,7 @@ void SurfRemesh :: loadMesh( const string &filename)
         aiMesh* srcMesh = scene->mMeshes[m];
 
         for( unsigned int v = 0; v < srcMesh->mNumVertices; v++ ) {
-            auto node = make_shared<Node>();
+            auto node = std::make_shared<Node>();
             node->id = nodeOffset + v;
             node->xyz = {srcMesh->mVertices[v].x,
                       srcMesh->mVertices[v].y,
@@ -79,7 +71,7 @@ void SurfRemesh :: loadMesh( const string &filename)
             aiFace& face = srcMesh->mFaces[f];
             if( face.mNumIndices != 3 ) continue;
 
-            auto dstFace = make_shared<Face>();
+            auto dstFace = std::make_shared<Face>();
             dstFace->nodes = {mesh.nodes[nodeOffset + face.mIndices[0]],
                             mesh.nodes[nodeOffset + face.mIndices[1]],
                             mesh.nodes[nodeOffset + face.mIndices[2]]};
@@ -89,36 +81,37 @@ void SurfRemesh :: loadMesh( const string &filename)
         nodeOffset += srcMesh->mNumVertices;
         faceOffset += srcMesh->mNumFaces;
     }
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void SurfRemesh :: readOFFMesh( const string &filename)
+bool SurfRemesh :: readOFFMesh( const std::string &filename) const
 {
-    ifstream ifile(filename.c_str(), ios::in);
+    std::ifstream ifile(filename.c_str(), std::ios::in);
     if( ifile.fail() ) {
-        cout << "Error: Can't open input file " << endl;
-        return;
+        std::cerr << "Error: Can't open input file " << filename << std::endl;
+        return false;
     }
 
-    string str;
+    std::string str;
     ifile >> str;
     if( str != "OFF") {
-        cout << "Error: input file not in the off format" << endl;
-        return;
+        std::cerr << "Error: input file not in the off format" << std::endl;
+        return false;
     }
 
     int numPoints, numFaces, numEdges;
     ifile >> numPoints >> numFaces >> numEdges;
 
     if( numPoints < 1) {
-        cout << "Warning: Input file has no points " << endl;
-        return;
+        std::cerr << "Warning: Input file has no points " << std::endl;
+        return false;
     }
 
     double x, y, z;
     mesh.nodes.resize(numPoints);
 
-    for( size_t i = 0; i < numPoints; i++) {
+    for( int i = 0; i < numPoints; i++) {
         ifile >> x >> y >> z;
         auto v = std::make_shared<Node>();
         v->id  = i;
@@ -129,7 +122,7 @@ void SurfRemesh :: readOFFMesh( const string &filename)
     mesh.faces.resize(numFaces);
 
     int  nn, i0, i1, i2;
-    for( size_t i = 0; i < numFaces; i++) {
+    for( int i = 0; i < numFaces; i++) {
         ifile >> nn; assert(nn == 3);
         ifile >> i0 >> i1 >> i2;
         auto n0 = mesh.nodes[i0];
@@ -139,6 +132,7 @@ void SurfRemesh :: readOFFMesh( const string &filename)
         face->nodes = {n0, n1, n2};
         mesh.faces[i] = face;
     }
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -147,11 +141,11 @@ int SurfRemesh::Edge::refine( double required_length)
 {
     newNodes.clear();
 
-    double currlen = length( nodes[0]->xyz, nodes[1]->xyz);
+    double currlen = JMath::length( nodes[0]->xyz, nodes[1]->xyz);
 
     if( currlen < required_length) return 0;
 
-    int nsegments = max(2.0, currlen/required_length);
+    int nsegments = std::max(2, static_cast<int>(currlen/required_length));
     int npoints   = nsegments-1;
 
     newNodes.resize(npoints);
@@ -174,7 +168,7 @@ SurfRemesh::EdgePtr SurfRemesh::Face::getEdgeAt( int i)
 {
     auto v0 = nodes[i];
     auto v1 = nodes[(i+1)%3];
-    auto vm = min(v0,v1);
+    auto vm = std::min(v0,v1);
     for( auto e : vm->edges) {
         if( e->isSame(v0,v1) ) return e;
     }
@@ -189,24 +183,24 @@ SurfRemesh::EdgePtr SurfRemesh::Face::getEdgeAt( int i)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-vector<double> SurfRemesh::Face::project()
+std::vector<double> SurfRemesh::Face::project()
 {
     uvCorners[0] = {0.0, 0.0};
 
-    double len0  = length(nodes[0]->xyz, nodes[1]->xyz);
+    double len0  = JMath::length(nodes[0]->xyz, nodes[1]->xyz);
     uvCorners[1] = {len0, 0.0};
 
     double angle  = angleAt(nodes[0]->xyz, nodes[1]->xyz, nodes[2]->xyz, ANGLE_IN_RADIANS);
-    double len1   = length(nodes[0]->xyz, nodes[2]->xyz);
-    uvCorners[2]  = {len1*cos(angle), len1*sin(angle)};
+    double len1   = JMath::length(nodes[0]->xyz, nodes[2]->xyz);
+    uvCorners[2]  = {len1*std::cos(angle), len1*std::sin(angle)};
 
-    vector<double> uvCoords;
+    std::vector<double> uvCoords;
 
     for( int i = 0; i < 3; i++) {
         uvCoords.push_back( uvCorners[i][0] );
         uvCoords.push_back( uvCorners[i][1] );
         auto edge = getEdgeAt(i);
-        int  npoints =  edge->newNodes.size();
+        int  npoints =  static_cast<int>(edge->newNodes.size());
         if( npoints ) {
             int nsegments = npoints + 1;
             double dt = 1.0/(double)nsegments;
@@ -221,8 +215,9 @@ vector<double> SurfRemesh::Face::project()
     }
     return uvCoords;
 }
+
 ////////////////////////////////////////////////////////////////////////////////
-void SurfRemesh::Face::unproject( const vector<double> &uvCoords)
+void SurfRemesh::Face::unproject( const std::vector<double> &uvCoords)
 {
     std::array<double,3> bCoords;
     std::array<Array3D,3> triCoords;
@@ -232,35 +227,35 @@ void SurfRemesh::Face::unproject( const vector<double> &uvCoords)
 
     auto getXYZCoords = [] ( const std::array<Array3D,3> &tCoords, const Array3D &bCoord) {
         Array3D xyz;
-        for( int i = 0; i < 3; i++)
+        for( size_t i = 0; i < 3; i++)
             xyz[i] = bCoord[0]*tCoords[0][i] + bCoord[1]*tCoords[1][i] + bCoord[2]*tCoords[2][i];
         return  xyz;
     };
 
-    int numNodes = uvCoords.size()/2;
+    int numNodes = static_cast<int>(uvCoords.size()/2);
 
     mesh = std::make_shared<Mesh>();
-    mesh->nodes.reserve( numNodes);
+    mesh->nodes.reserve( static_cast<size_t>(numNodes) );
 
     int istart =  3;
     for( int i = 0; i < 3; i++) {
         auto edge = getEdgeAt(i);
-        int  np   = edge->newNodes.size();
+        int  np   = static_cast<int>(edge->newNodes.size());
         istart   += np;
         mesh->nodes.push_back( nodes[i] );
         int ori = edge->getOrientation(nodes[i], nodes[(i+1)%3] );
         assert( ori );
         if( ori > 0 ) {
             for( int j = 0; j < np; j++)
-                mesh->nodes.push_back( edge->newNodes[j] ) ;
+                mesh->nodes.push_back( edge->newNodes[j] );
         } else {
             for( int j = 0; j < np; j++)
-                mesh->nodes.push_back( edge->newNodes[np-j-1] ) ;
+                mesh->nodes.push_back( edge->newNodes[np-j-1] );
         }
     }
 
     Array2D qPoint;
-    for( size_t i = istart; i < numNodes; i++) {
+    for( int i = istart; i < numNodes; i++) {
         qPoint[0]  = uvCoords[2*i];
         qPoint[1]  = uvCoords[2*i+1];
         bCoords    = barycoordinates(uvCorners[0], uvCorners[1], uvCorners[2], qPoint);
@@ -269,18 +264,18 @@ void SurfRemesh::Face::unproject( const vector<double> &uvCoords)
         mesh->nodes.push_back(vtx);
     }
 }
-////////////////////////////////////////////////////////////////////////////////
-void SurfRemesh::Face::delaunay(vector<int> &segments, vector<double> &uvCoords, vector<int> &triConnect)
-{
-    struct triangulateio in, out; // triangle sw data structure
 
-    // The following stuff is for "Triangle" software ...
-    in.numberofpoints = uvCoords.size()/2;
+////////////////////////////////////////////////////////////////////////////////
+void SurfRemesh::Face::delaunay(std::vector<int> &segments, std::vector<double> &uvCoords, std::vector<int> &triConnect, double minAngle)
+{
+    struct triangulateio in, out;
+
+    in.numberofpoints = static_cast<int>(uvCoords.size()/2);
     in.pointlist = &uvCoords[0];
 
     double triarea[] = {area};
 
-    in.numberofsegments = segments.size()/2;
+    in.numberofsegments = static_cast<int>(segments.size()/2);
     in.segmentlist  = &segments[0];
 
     in.numberofholes = 0;
@@ -295,9 +290,6 @@ void SurfRemesh::Face::delaunay(vector<int> &segments, vector<double> &uvCoords,
     in.regionlist = nullptr;
     in.trianglearealist = triarea;
 
-    // These needs to declared, I wasted full one day to find out this
-    // restriction
-
     out.pointlist = nullptr;
     out.pointmarkerlist = nullptr;
     out.trianglelist = nullptr;
@@ -307,12 +299,12 @@ void SurfRemesh::Face::delaunay(vector<int> &segments, vector<double> &uvCoords,
     out.edgelist = nullptr;
     out.edgemarkerlist = nullptr;
 
-    ostringstream oss;
-    oss << "BYCPpzQq30";
-    string options = oss.str();
+    std::ostringstream oss;
+    oss << "BYCPpzQ" << minAngle;
+    std::string options = oss.str();
 
     char *opt = const_cast<char*>( options.c_str() );
-    triangulate(opt, &in, &out, (struct triangulateio *) nullptr);
+    triangulate(opt, &in, &out, static_cast<struct triangulateio *>(nullptr));
 
     uvCoords.resize(2*out.numberofpoints);
     for (int i = 0; i < out.numberofpoints; i++) {
@@ -331,16 +323,16 @@ void SurfRemesh::Face::delaunay(vector<int> &segments, vector<double> &uvCoords,
     if (out.trianglelist) free(out.trianglelist);
 }
 
-//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
-void SurfRemesh::Face::refine(double maxarea)
+void SurfRemesh::Face::refine(double maxarea, double minAngle)
 {
     area = maxarea;
-    vector<double> uvCoords = project();
+    std::vector<double> uvCoords = project();
 
-    int nPoints = uvCoords.size()/2;
+    int nPoints = static_cast<int>(uvCoords.size()/2);
 
-    vector<int> segments(2*nPoints);
+    std::vector<int> segments(2*nPoints);
 
     int index = 0;
     for( int i = 0; i < nPoints; i++) {
@@ -349,11 +341,11 @@ void SurfRemesh::Face::refine(double maxarea)
         index++;
     }
 
-    vector<int> trifaces;
-    delaunay(segments, uvCoords, trifaces);
+    std::vector<int> trifaces;
+    delaunay(segments, uvCoords, trifaces, minAngle);
     unproject( uvCoords);
 
-    int numTris = trifaces.size()/3;
+    int numTris = static_cast<int>(trifaces.size()/3);
     mesh->faces.resize(numTris);
     for( int i = 0; i < numTris; i++) {
         auto n0 = mesh->nodes[trifaces[3*i+0]];
@@ -365,79 +357,71 @@ void SurfRemesh::Face::refine(double maxarea)
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
-void SurfRemesh::buildEdges()
+void SurfRemesh::buildEdges() const
 {
-    for(auto vtx : mesh.nodes) vtx->edges.clear();
+    for(auto& vtx : mesh.nodes) vtx->edges.clear();
 
-    // Calling getEdgeAt will build new edges and store on the nodes ...
-    for( auto face : mesh.faces) {
+    for( auto& face : mesh.faces) {
         for( int i = 0; i < 3; i++) face->getEdgeAt(i);
     }
 
-    // Now collect unique edges from the nodes ...
     mesh.edges.clear();
-    for( auto vtx : mesh.nodes) {
-        for( auto e : vtx->edges) mesh.edges.push_back(e);
+    std::set<std::shared_ptr<Edge>> uniqueEdges;
+    for( auto& vtx : mesh.nodes) {
+        for( auto& e : vtx->edges) uniqueEdges.insert(e);
     }
+    for( auto& e : uniqueEdges) mesh.edges.push_back(e);
 }
 
-//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 void SurfRemesh::refine()
 {
-    if( mesh.nodes.empty() ) loadMesh( infilename);
+    if( mesh.nodes.empty() ) {
+        if (!loadMesh( infilename)) return;
+    }
 
-    while(1) {
+    while(true) {
 
-        // Generate unique edges from the faces..
         buildEdges();
 
-        // First refine all the edges ...
         size_t ncount = 0;
-        for( auto edge : mesh.edges) ncount += edge->refine(maxEdgeLength);
+        for( auto& edge : mesh.edges) ncount += edge->refine(maxEdgeLength);
 
-	cout << "#Edges refined " << ncount << endl;
+        std::cout << "#Edges refined " << ncount << std::endl;
 
         if( ncount == 0) break;
 
-	double maxarea = sqrt(3)*0.25*maxEdgeLength*maxEdgeLength;
-//#pragma omp parallel for
-        for( size_t i = 0; i < mesh.faces.size(); i++) 
-             mesh.faces[i]->refine(maxarea);
+        double maxarea = std::sqrt(3)*0.25*maxEdgeLength*maxEdgeLength;
+        for( size_t i = 0; i < mesh.faces.size(); i++)
+             mesh.faces[i]->refine(maxarea, qualityMinAngle);
 
-        // Count number of nodes in the output (orginal + edgenodes + facenodes)
-        size_t countnodes = mesh.nodes.size(); // from the input mesh.
-        for(auto edge : mesh.edges) countnodes += edge->newNodes.size();
+        size_t countnodes = mesh.nodes.size();
+        for(auto& edge : mesh.edges) countnodes += edge->newNodes.size();
 
-        // Count number of faces in the output ...
-        for(auto face : mesh.faces) countnodes += face->mesh->nodes.size();
-
-        size_t countfaces = mesh.faces.size();
-        for( auto face : mesh.faces) countfaces += face->mesh->faces.size();
+        for(auto& face : mesh.faces) countnodes += face->mesh->nodes.size();
 
         mesh.nodes.reserve( countnodes);
 
-        // Collect new nodes on the edges ...
-        int offset = mesh.nodes.size();
-        for( auto edge : mesh.edges) {
-            for( auto vtx : edge->newNodes) {
+        size_t offset = mesh.nodes.size();
+        for( auto& edge : mesh.edges) {
+            for( auto& vtx : edge->newNodes) {
                 vtx->id = offset++;
                 mesh.nodes.push_back(vtx);
             }
         }
         mesh.edges.clear();
 
-        // Collect new nodes on the faces ...
-        vector<FacePtr> allfaces;
-        for( auto face : mesh.faces) {
+        std::vector<FacePtr> allfaces;
+        for( auto& face : mesh.faces) {
             assert( face->mesh );
-            for( auto vtx : face->mesh->nodes) {
+            for( auto& vtx : face->mesh->nodes) {
                 vtx->id = offset++;
                 mesh.nodes.push_back(vtx);
             }
-            for( auto f : face->mesh->faces)
+            for( auto& f : face->mesh->faces)
                 allfaces.push_back(f);
             face->mesh = nullptr;
         }
@@ -445,12 +429,13 @@ void SurfRemesh::refine()
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 std::vector<Array3D> SurfRemesh :: getNodes() const
 {
-    vector<Array3D> nodes;
-    for( auto v : mesh.nodes)
+    std::vector<Array3D> nodes;
+    nodes.reserve(mesh.nodes.size());
+    for( const auto& v : mesh.nodes)
         nodes.push_back(v->xyz);
     return nodes;
 }
@@ -459,21 +444,22 @@ std::vector<Array3D> SurfRemesh :: getNodes() const
 
 std::vector<Array3I> SurfRemesh :: getTriangles() const
 {
-    vector<Array3I> tris;
-    for( auto face : mesh.faces) {
-        tris.push_back({(int)face->nodes[0]->id,
-                     (int)face->nodes[1]->id,
-                     (int)face->nodes[2]->id});
+    std::vector<Array3I> tris;
+    tris.reserve(mesh.faces.size());
+    for( const auto& face : mesh.faces) {
+        tris.push_back({static_cast<int>(face->nodes[0]->id),
+                     static_cast<int>(face->nodes[1]->id),
+                     static_cast<int>(face->nodes[2]->id)});
     }
     return tris;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-array<double,3> SurfRemesh :: getEdgeLengths() const
+std::array<double,3> SurfRemesh :: getEdgeLengths() const
 {
-    vector<double> lengths;
-    for( auto face : mesh.faces) {
+    std::vector<double> lengths;
+    for( const auto& face : mesh.faces) {
         auto p0 = face->nodes[0]->xyz;
         auto p1 = face->nodes[1]->xyz;
         auto p2 = face->nodes[2]->xyz;
@@ -484,8 +470,8 @@ array<double,3> SurfRemesh :: getEdgeLengths() const
 
     double minLen = lengths[0], maxLen = lengths[0], sum = 0;
     for( double len : lengths ) {
-        minLen = min(minLen, len);
-        maxLen = max(maxLen, len);
+        minLen = std::min(minLen, len);
+        maxLen = std::max(maxLen, len);
         sum += len;
     }
     double mean = sum / lengths.size();
@@ -495,21 +481,27 @@ array<double,3> SurfRemesh :: getEdgeLengths() const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void SurfRemesh:: saveAs( const string &filename)
+bool SurfRemesh::saveAs( const std::string &filename) const
 {
-    ofstream ofile( filename.c_str(), ios::out);
-    ofile << "OFF" << endl;
+    std::ofstream ofile( filename.c_str(), std::ios::out);
+    if( ofile.fail() ) {
+        std::cerr << "Error: Can't open output file " << filename << std::endl;
+        return false;
+    }
 
-    ofile <<  mesh.nodes.size() << " " << mesh.faces.size() << " 0 " << endl;
+    ofile << "OFF" << std::endl;
+    ofile << mesh.nodes.size() << " " << mesh.faces.size() << " 0 " << std::endl;
 
-    for( auto v : mesh.nodes)
-        ofile << v->xyz[0] << " " << v->xyz[1] << " " << v->xyz[2] << endl;
+    for( const auto& v : mesh.nodes) {
+        ofile << v->xyz[0] << " " << v->xyz[1] << " " << v->xyz[2] << std::endl;
+    }
 
-    for( auto face : mesh.faces) {
+    for( const auto& face : mesh.faces) {
         ofile << "3 " << face->nodes[0]->id << " "
               << face->nodes[1]->id << " "
-              << face->nodes[2]->id << endl;
+              << face->nodes[2]->id << std::endl;
     }
+    return true;
 }
 
-//////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
